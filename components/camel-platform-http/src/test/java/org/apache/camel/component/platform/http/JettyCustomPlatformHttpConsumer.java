@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Enumeration;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
@@ -29,6 +30,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.Processor;
+import org.apache.camel.spi.HeaderFilterStrategy;
 import org.apache.camel.support.CamelContextHelper;
 import org.apache.camel.support.DefaultConsumer;
 import org.apache.camel.support.DefaultMessage;
@@ -91,6 +93,9 @@ public class JettyCustomPlatformHttpConsumer extends DefaultConsumer {
                     }
                     createUoW(exchange);
                     getProcessor().process(exchange);
+                    if (exchange.getException() != null) {
+                        throw exchange.getException();
+                    }
                     httpServletResponse.setStatus(HttpServletResponse.SC_OK);
                     request.setHandled(true);
                     if (getEndpoint().isHttpProxy()) {
@@ -103,6 +108,8 @@ public class JettyCustomPlatformHttpConsumer extends DefaultConsumer {
                 } catch (Exception e) {
                     getExceptionHandler().handleException("Failed handling platform-http endpoint " + endpoint.getPath(), exchg,
                             e);
+                    httpServletResponse.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    request.setHandled(true);
                 } finally {
                     if (exchg != null) {
                         doneUoW(exchg);
@@ -121,6 +128,18 @@ public class JettyCustomPlatformHttpConsumer extends DefaultConsumer {
         if (charset != null) {
             exchange.setProperty(Exchange.CHARSET_NAME, charset);
             message.setHeader(Exchange.HTTP_CHARACTER_ENCODING, charset);
+        }
+
+        // copy request headers, skipping those rejected by the endpoint's header filter strategy
+        final HeaderFilterStrategy headerFilterStrategy = getEndpoint().getHeaderFilterStrategy();
+        final Enumeration<String> headerNames = request.getHeaderNames();
+        while (headerNames.hasMoreElements()) {
+            final String name = headerNames.nextElement();
+            final String value = request.getHeader(name);
+            if (headerFilterStrategy == null
+                    || !headerFilterStrategy.applyFilterToExternalHeaders(name, value, exchange)) {
+                message.setHeader(name, value);
+            }
         }
 
         message.setBody(body.length() != 0 ? body : null);

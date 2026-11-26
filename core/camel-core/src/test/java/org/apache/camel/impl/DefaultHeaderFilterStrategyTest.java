@@ -25,6 +25,7 @@ import org.apache.camel.support.DefaultExchange;
 import org.apache.camel.support.DefaultHeaderFilterStrategy;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.camel.support.DefaultHeaderFilterStrategy.CAMEL_FILTER_PATTERN;
 import static org.apache.camel.support.DefaultHeaderFilterStrategy.CAMEL_FILTER_STARTS_WITH;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -168,6 +169,65 @@ public class DefaultHeaderFilterStrategyTest extends ContextTestSupport {
         exchange.getIn().setHeader("foo", "cheese");
         exchange.getIn().setHeader("CamelVersion", "3.7");
         exchange.getIn().setHeader("org.apache.camel.component.jetty.session", "true");
+
+        assertFalse(comp.applyFilterToExternalHeaders("bar", 123, exchange));
+        assertFalse(comp.applyFilterToExternalHeaders("foo", "cheese", exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("CamelVersion", "3.7", exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("org.apache.camel.component.jetty.session", "true", exchange));
+    }
+
+    @Test
+    public void testInStartsWithLowerCase() {
+        DefaultHeaderFilterStrategy comp = new DefaultHeaderFilterStrategy();
+        comp.setLowerCase(true);
+
+        comp.setInFilterStartsWith(CAMEL_FILTER_STARTS_WITH);
+
+        Exchange exchange = new DefaultExchange(context);
+        exchange.getIn().setHeader("bar", 123);
+        exchange.getIn().setHeader("foo", "cheese");
+        exchange.getIn().setHeader("caMElVersion", "3.7");
+        exchange.getIn().setHeader("org.apache.CAMEL.component.jetty.session", "true");
+
+        assertTrue(comp.applyFilterToExternalHeaders("caMElVersion", 123, exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("cAmelResponseCode", 503, exchange));
+
+        assertFalse(comp.applyFilterToExternalHeaders("bar", 123, exchange));
+        assertFalse(comp.applyFilterToExternalHeaders("foo", "cheese", exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("CamelVersion", "3.7", exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("org.apache.camel.component.jetty.session", "true", exchange));
+    }
+
+    @Test
+    public void testOutStartsWithLowerCase() {
+        DefaultHeaderFilterStrategy comp = new DefaultHeaderFilterStrategy();
+        comp.setLowerCase(true);
+
+        comp.setOutFilterStartsWith(CAMEL_FILTER_STARTS_WITH);
+
+        Exchange exchange = new DefaultExchange(context);
+
+        assertTrue(comp.applyFilterToCamelHeaders("cAMELExecCommandExecutable", "id", exchange));
+        assertTrue(comp.applyFilterToCamelHeaders("CAMELHttpResponseCode", 503, exchange));
+        assertTrue(comp.applyFilterToCamelHeaders("ORG.APACHE.CAMEL.component.jetty.session", "true", exchange));
+
+        assertFalse(comp.applyFilterToCamelHeaders("bar", 123, exchange));
+        assertFalse(comp.applyFilterToCamelHeaders("foo", "cheese", exchange));
+        assertTrue(comp.applyFilterToCamelHeaders("CamelVersion", "3.7", exchange));
+    }
+
+    @Test
+    public void testInFilterPatternLowerCase() {
+        DefaultHeaderFilterStrategy comp = new DefaultHeaderFilterStrategy();
+        comp.setLowerCase(true);
+
+        comp.setInFilterPattern(CAMEL_FILTER_PATTERN);
+
+        Exchange exchange = new DefaultExchange(context);
+
+        assertTrue(comp.applyFilterToExternalHeaders("caMElExecCommandExecutable", "id", exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("CAMELHttpResponseCode", 503, exchange));
+        assertTrue(comp.applyFilterToExternalHeaders("Org.Apache.Camel.component.jetty.session", "true", exchange));
 
         assertFalse(comp.applyFilterToExternalHeaders("bar", 123, exchange));
         assertFalse(comp.applyFilterToExternalHeaders("foo", "cheese", exchange));
